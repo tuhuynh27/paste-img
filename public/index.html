@@ -116,6 +116,15 @@
   .btn:hover, .btn:focus-visible { border-color: var(--safe); color: var(--safe); outline: none; }
   .btn.done { border-color: var(--ok); color: var(--ok); }
 
+  .all {
+    display: none; width: 100%; margin-bottom: 14px; resize: vertical;
+    background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    font: inherit; font-size: 16px; line-height: 1.5; padding: 10px 12px; border-radius: 0;
+    white-space: pre; overflow: auto;
+  }
+  .all.show { display: block; }
+  .all:focus { outline: 2px solid var(--safe); outline-offset: -1px; }
+
   ol { list-style: none; padding: 0; }
   li {
     display: grid;
@@ -181,6 +190,7 @@
     <span id="count"></span>
     <button class="btn" id="copyAll" type="button">Copy all URLs</button>
   </div>
+  <textarea class="all" id="all" readonly rows="3" aria-label="All image URLs" spellcheck="false"></textarea>
   <ol id="list" aria-live="polite"></ol>
 </main>
 
@@ -220,6 +230,11 @@ function refreshBar() {
   bar.classList.toggle('show', list.children.length > 0);
   $('count').textContent = urls.length + ' ready';
   $('copyAll').style.display = urls.length > 1 ? '' : 'none';
+
+  const all = $('all');
+  all.classList.toggle('show', urls.length > 1);
+  all.value = urls.join('\n');
+  all.rows = Math.min(Math.max(urls.length, 2), 8);
 }
 
 async function send(file) {
@@ -332,6 +347,7 @@ fileIn.addEventListener('change', () => { handle(fileIn.files); fileIn.value = '
 }));
 document.addEventListener('drop', (e) => handle(e.dataTransfer.files));
 
+$('all').addEventListener('focus', (e) => e.target.select());
 $('copyAll').addEventListener('click', (e) => copy(urls.join('\n'), e.currentTarget, 'Copy all URLs'));
 </script>
 </body>
