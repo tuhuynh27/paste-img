@@ -78,7 +78,10 @@ function upload(req, res) {
 
     const name = `${crypto.randomBytes(9).toString('base64url')}.${ext}`;
     fs.writeFile(path.join(DATA_DIR, name), buf, (err) => {
-      if (err) return send(res, 500, { error: 'Write failed' });
+      if (err) {
+        console.error('write failed:', err.message);
+        return send(res, 500, { error: 'Write failed' });
+      }
       send(res, 201, { url: `${baseUrl(req)}/i/${name}`, name, bytes: buf.length });
     });
   });
