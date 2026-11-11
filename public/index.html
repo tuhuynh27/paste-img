@@ -83,9 +83,23 @@
   .token label { color: var(--safe); font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
   .token input {
     flex: 1; background: var(--panel); border: 1px solid var(--line);
-    color: var(--text); font: inherit; padding: 8px 10px; border-radius: 0;
+    color: var(--text); font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 0;
   }
   .token input:focus { outline: 2px solid var(--safe); outline-offset: -1px; }
+
+  .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .btn.primary { background: var(--safe); border-color: var(--safe); color: #0e0d0c; font-weight: 500; padding: 10px 16px; }
+  .btn.primary:hover, .btn.primary:focus-visible { background: transparent; color: var(--safe); }
+  .hint { color: var(--dim); font-size: 12px; min-height: 1.6em; }
+  .hint.err { color: var(--safe); }
+  .catch {
+    display: none; flex: 1 1 100%; padding: 12px; border: 1px dashed var(--line);
+    color: var(--dim); font-size: 16px; min-height: 44px; outline: none;
+    -webkit-user-select: text; user-select: text;
+  }
+  .catch.show { display: block; }
+  .catch:focus { border-color: var(--safe); color: var(--text); }
+  .catch:empty::before { content: attr(data-ph); }
 
   /* results */
   .bar {
@@ -150,6 +164,13 @@
     <span>or click to browse. Multiple files supported.</span>
   </button>
   <input id="file" type="file" accept="image/*" multiple hidden>
+
+  <div class="actions">
+    <button class="btn primary" id="pasteBtn" type="button">Paste from clipboard</button>
+    <span class="hint" id="hint" role="status"></span>
+    <div class="catch" id="catch" contenteditable="true" role="textbox" aria-label="Paste target"
+         data-ph="Touch and hold here, then tap Paste"></div>
+  </div>
 
   <div class="token" id="tokenRow">
     <label for="token">Token</label>
@@ -246,11 +267,58 @@ async function handle(files) {
   if (got.length) copy(got.join('\n')).catch?.(() => {});
 }
 
-document.addEventListener('paste', (e) => {
+function clipFiles(dt) {
+  const files = [...(dt?.files || [])];
+  if (files.length) return files;
+  return [...(dt?.items || [])]
+    .filter((i) => i.kind === 'file')
+    .map((i) => i.getAsFile())
+    .filter(Boolean);
+}
+
+function onPaste(e) {
   if (e.target === tokenIn) return;
-  const files = [...(e.clipboardData?.files || [])];
-  if (files.length) { e.preventDefault(); handle(files); }
+  const files = clipFiles(e.clipboardData);
+  if (files.length) { e.preventDefault(); handle(files); return; }
+  if (e.target === catcher) e.preventDefault();
+  say('No image in clipboard', true);
+}
+document.addEventListener('paste', onPaste);
+
+const hint = $('hint'), catcher = $('catch');
+function say(msg, bad) {
+  hint.textContent = msg;
+  hint.classList.toggle('err', !!bad);
+}
+
+// iOS Safari has no document-level paste without a focused editable
+// element, so offer an explicit button plus an editable paste target.
+$('pasteBtn').addEventListener('click', async () => {
+  say('');
+  if (!navigator.clipboard?.read) {
+    catcher.classList.add('show');
+    catcher.focus();
+    say('Browser blocks direct paste. Use the box below.');
+    return;
+  }
+  try {
+    const items = await navigator.clipboard.read();
+    const files = [];
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'));
+      if (!type) continue;
+      const blob = await item.getType(type);
+      files.push(new File([blob], 'pasted.' + type.split('/')[1], { type }));
+    }
+    if (files.length) handle(files);
+    else say('No image in clipboard', true);
+  } catch (e) {
+    catcher.classList.add('show');
+    say(e.name === 'NotAllowedError' ? 'Paste was blocked. Try the box below.' : 'Paste failed. Try the box below.', true);
+  }
 });
+
+catcher.addEventListener('input', () => { catcher.textContent = ''; });
 
 drop.addEventListener('click', () => fileIn.click());
 fileIn.addEventListener('change', () => { handle(fileIn.files); fileIn.value = ''; });
